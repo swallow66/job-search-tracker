@@ -1,0 +1,167 @@
+@page "/applications/new"
+@page "/applications/{Id:int}/edit"
+@using System.ComponentModel.DataAnnotations
+@using JobSearchTracker.Core.Entities
+@using JobSearchTracker.Core.Enums
+@using JobSearchTracker.Data.Services
+@using JobSearchTracker.Web.Models
+@inject ApplicationService ApplicationService
+@inject CompanyService CompanyService
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+<PageTitle>@(Id is null ? "Add Application" : "Edit Application")</PageTitle>
+
+<h1>@(Id is null ? "Add Application" : "Edit Application")</h1>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <EditForm Model="_model" OnValidSubmit="SaveAsync" class="application-form">
+        <DataAnnotationsValidator />
+
+        <div class="form-group">
+            <label>Company Name</label>
+            <InputText @bind-Value="_model.CompanyName" list="company-suggestions" />
+            <datalist id="company-suggestions">
+                @foreach (var name in _companyNames)
+                {
+                    <option value="@name" />
+                }
+            </datalist>
+            <ValidationMessage For="() => _model.CompanyName" />
+        </div>
+
+        <div class="form-group">
+            <label>Application Date</label>
+            <InputDate @bind-Value="_model.ApplicationDate" />
+            <ValidationMessage For="() => _model.ApplicationDate" />
+        </div>
+
+        <div class="form-group">
+            <label>Position Title</label>
+            <InputText @bind-Value="_model.PositionTitle" />
+        </div>
+
+        <div class="form-group">
+            <label>Job Posting URL</label>
+            <InputText @bind-Value="_model.JobPostingUrl" placeholder="https://..." />
+            <ValidationMessage For="() => _model.JobPostingUrl" />
+        </div>
+
+        <div class="form-group">
+            <label>Applied Via</label>
+            <InputSelect @bind-Value="_model.Source">
+                @foreach (var source in Enum.GetValues<ApplicationSource>())
+                {
+                    <option value="@source">@source</option>
+                }
+            </InputSelect>
+        </div>
+
+        @if (_model.Source == ApplicationSource.Other)
+        {
+            <div class="form-group">
+                <label>Describe Source</label>
+                <InputText @bind-Value="_model.SourceOtherDescription" />
+            </div>
+        }
+
+        <div class="form-group">
+            <label>Application Link (if different from posting)</label>
+            <InputText @bind-Value="_model.SourceUrl" placeholder="https://..." />
+            <ValidationMessage For="() => _model.SourceUrl" />
+        </div>
+
+        <div class="form-group">
+            <label>Resume Version</label>
+            <InputText @bind-Value="_model.ResumeVersion" placeholder="e.g. Resume_BackendDev_v2" />
+        </div>
+
+        <div class="form-group">
+            <label>Resume File Path</label>
+            <InputText @bind-Value="_model.ResumeFilePath" placeholder="C:\Resumes\..." />
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a class="btn btn-link" href="/">Cancel</a>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private readonly ApplicationFormModel _model = new();
+    private List<string> _companyNames = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _companyNames = (await CompanyService.GetAllAsync()).Select(c => c.Name).ToList();
+
+        if (Id is not null)
+        {
+            var existing = await ApplicationService.GetByIdAsync(Id.Value);
+            if (existing is not null)
+            {
+                _model.CompanyName = existing.Company.Name;
+                _model.ApplicationDate = existing.ApplicationDate;
+                _model.PositionTitle = existing.PositionTitle;
+                _model.JobPostingUrl = existing.JobPostingUrl;
+                _model.Source = existing.Source;
+                _model.SourceOtherDescription = existing.SourceOtherDescription;
+                _model.SourceUrl = existing.SourceUrl;
+                _model.ResumeVersion = existing.ResumeVersion;
+                _model.ResumeFilePath = existing.ResumeFilePath;
+            }
+        }
+
+        _loading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        var company = await CompanyService.GetOrCreateByNameAsync(_model.CompanyName);
+
+        if (Id is null)
+        {
+            var application = new Application
+            {
+                CompanyId = company.Id,
+                ApplicationDate = _model.ApplicationDate,
+                PositionTitle = _model.PositionTitle,
+                JobPostingUrl = _model.JobPostingUrl,
+                Source = _model.Source,
+                SourceOtherDescription = _model.SourceOtherDescription,
+                SourceUrl = _model.SourceUrl,
+                ResumeVersion = _model.ResumeVersion,
+                ResumeFilePath = _model.ResumeFilePath
+            };
+            await ApplicationService.CreateAsync(application);
+        }
+        else
+        {
+            var existing = await ApplicationService.GetByIdAsync(Id.Value);
+            if (existing is not null)
+            {
+                existing.CompanyId = company.Id;
+                existing.ApplicationDate = _model.ApplicationDate;
+                existing.PositionTitle = _model.PositionTitle;
+                existing.JobPostingUrl = _model.JobPostingUrl;
+                existing.Source = _model.Source;
+                existing.SourceOtherDescription = _model.SourceOtherDescription;
+                existing.SourceUrl = _model.SourceUrl;
+                existing.ResumeVersion = _model.ResumeVersion;
+                existing.ResumeFilePath = _model.ResumeFilePath;
+                await ApplicationService.UpdateAsync(existing);
+            }
+        }
+
+        Nav.NavigateTo("/");
+    }
+}

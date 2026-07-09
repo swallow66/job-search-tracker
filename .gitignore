@@ -1,0 +1,17 @@
+## .NET
+bin/
+obj/
+*.user
+
+## SQLite local data (never commit personal job search data)
+*.db
+*.db-shm
+*.db-wal
+
+## VS Code
+.vs/
+
+## OS
+Thumbs.db
+.DS_Store
+.claude/settings.local.json
