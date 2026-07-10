@@ -21,6 +21,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<ApplicationService>();
 builder.Services.AddScoped<CompanyService>();
 builder.Services.AddSingleton<ResumeStorageService>();
+builder.Services.AddHttpClient<LinkedInJobSearchService>();
+builder.Services.AddScoped<SearchRequestService>();
+builder.Services.AddScoped<JobPostingService>();
+builder.Services.AddScoped<JobSearchRunnerService>();
 
 var app = builder.Build();
 

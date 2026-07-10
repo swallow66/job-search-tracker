@@ -8,6 +8,7 @@
 @using JobSearchTracker.Web.Services
 @inject ApplicationService ApplicationService
 @inject CompanyService CompanyService
+@inject JobPostingService JobPostingService
 @inject ResumeStorageService ResumeStorage
 @inject NavigationManager Nav
 @rendermode InteractiveServer
@@ -112,6 +113,15 @@ else
 @code {
     [Parameter] public int? Id { get; set; }
 
+    [SupplyParameterFromQuery(Name = "jobPostingId")]
+    public int? PrefillJobPostingId { get; set; }
+    [SupplyParameterFromQuery(Name = "companyName")]
+    public string? PrefillCompanyName { get; set; }
+    [SupplyParameterFromQuery(Name = "positionTitle")]
+    public string? PrefillPositionTitle { get; set; }
+    [SupplyParameterFromQuery(Name = "jobPostingUrl")]
+    public string? PrefillJobPostingUrl { get; set; }
+
     private readonly ApplicationFormModel _model = new();
     private List<string> _companyNames = [];
     private bool _loading = true;
@@ -136,6 +146,14 @@ else
                 _model.ResumeFilePath = existing.ResumeFilePath;
             }
         }
+        else if (PrefillJobPostingId is not null)
+        {
+            _model.CompanyName = PrefillCompanyName ?? string.Empty;
+            _model.PositionTitle = PrefillPositionTitle;
+            _model.JobPostingUrl = PrefillJobPostingUrl;
+            _model.Source = ApplicationSource.LinkedIn;
+            _model.SourceUrl = PrefillJobPostingUrl;
+        }
 
         _loading = false;
     }
@@ -159,6 +177,8 @@ else
                 ResumeFilePath = _model.ResumeFilePath
             };
             await ApplicationService.CreateAsync(application);
+            if (PrefillJobPostingId is not null)
+                await JobPostingService.MarkAppliedAsync(PrefillJobPostingId.Value, application.Id);
         }
         else
         {

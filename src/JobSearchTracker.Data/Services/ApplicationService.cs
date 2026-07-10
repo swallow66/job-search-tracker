@@ -1,4 +1,5 @@
 using JobSearchTracker.Core.Entities;
+using JobSearchTracker.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace JobSearchTracker.Data.Services;
@@ -48,6 +49,14 @@ public class ApplicationService(AppDbContext db)
         var application = await db.Applications.FindAsync(id);
         if (application is not null)
         {
+            var linkedPosting = await db.JobPostings.FirstOrDefaultAsync(p => p.ApplicationId == id);
+            if (linkedPosting is not null)
+            {
+                linkedPosting.ApplicationId = null;
+                linkedPosting.Status = JobPostingStatus.Viewed;
+                linkedPosting.AppliedAt = null;
+            }
+
             db.Applications.Remove(application);
             await db.SaveChangesAsync();
         }

@@ -1,0 +1,166 @@
+@page "/positions/{SearchRequestId:int}"
+@using JobSearchTracker.Core.Entities
+@using JobSearchTracker.Core.Enums
+@using JobSearchTracker.Data.Services
+@inject SearchRequestService SearchRequestService
+@inject JobPostingService JobPostingService
+@inject JobSearchRunnerService JobSearchRunner
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+<PageTitle>@(_search?.Name ?? "Search Results")</PageTitle>
+
+@if (_search is null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <div class="page-header">
+        <div>
+            <h1>@_search.Name</h1>
+            <p class="search-subtitle">@_search.Keywords &middot; @_search.Location</p>
+        </div>
+        <div class="page-header-actions">
+            <button class="btn btn-secondary" @onclick="RunAsync" disabled="@_running">
+                @(_running ? "Running..." : "Run Search")
+            </button>
+            <a class="btn btn-link" href="/positions/searches/@_search.Id/edit">Edit Search</a>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_runSummary))
+    {
+        <p class="run-summary">@_runSummary</p>
+    }
+
+    <div class="filters">
+        @foreach (var tab in _statusTabs)
+        {
+            <button class="btn @(tab == _activeTab ? "btn-primary" : "btn-secondary")" @onclick="() => SetTabAsync(tab)">
+                @(tab?.ToString() ?? "All")
+            </button>
+        }
+    </div>
+
+    @if (_postings is null)
+    {
+        <p>Loading...</p>
+    }
+    else if (_postings.Count == 0)
+    {
+        <p class="empty-state">No postings in this view yet. Click "Run Search" to check for new ones.</p>
+    }
+    else
+    {
+        <table class="applications-table">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Company</th>
+                    <th>Location</th>
+                    <th>Posted</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var posting in _postings)
+                {
+                    <tr>
+                        <td><a href="@posting.PostingUrl" target="_blank" rel="noopener" @onclick="() => OnPostingOpenedAsync(posting)">@posting.Title</a></td>
+                        <td>@(posting.CompanyName ?? "—")</td>
+                        <td>@(posting.Location ?? "—")</td>
+                        <td>@(posting.PostedDate?.ToString("yyyy-MM-dd") ?? "—")</td>
+                        <td><span class="badge @StatusBadgeClass(posting.Status)">@posting.Status</span></td>
+                        <td class="actions">
+                            @if (posting.Status != JobPostingStatus.Applied)
+                            {
+                                <a href="@ApplyUrl(posting)">Mark Applied</a>
+                            }
+                            @if (posting.Status != JobPostingStatus.Dismissed && posting.Status != JobPostingStatus.Applied)
+                            {
+                                <button class="btn btn-link btn-danger" @onclick="() => DismissAsync(posting.Id)">Dismiss</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    [Parameter] public int SearchRequestId { get; set; }
+
+    private SearchRequest? _search;
+    private List<JobPosting>? _postings;
+    private JobPostingStatus? _activeTab;
+    private readonly JobPostingStatus?[] _statusTabs = [null, JobPostingStatus.New, JobPostingStatus.Viewed, JobPostingStatus.Applied, JobPostingStatus.Dismissed];
+    private bool _running;
+    private string? _runSummary;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _search = await SearchRequestService.GetByIdAsync(SearchRequestId);
+        var all = await JobPostingService.GetBySearchRequestAsync(SearchRequestId);
+        _postings = _activeTab is null ? all : all.Where(p => p.Status == _activeTab).ToList();
+    }
+
+    private async Task SetTabAsync(JobPostingStatus? tab)
+    {
+        _activeTab = tab;
+        await LoadAsync();
+    }
+
+    private async Task RunAsync()
+    {
+        _running = true;
+        _runSummary = null;
+        try
+        {
+            var newCount = await JobSearchRunner.RunAsync(SearchRequestId);
+            _runSummary = $"Found {newCount} new posting(s).";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _runSummary = $"Search run failed: {ex.Message}";
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+
+    private async Task OnPostingOpenedAsync(JobPosting posting)
+    {
+        if (posting.Status == JobPostingStatus.New)
+        {
+            await JobPostingService.MarkViewedAsync(posting.Id);
+            await LoadAsync();
+        }
+    }
+
+    private async Task DismissAsync(int id)
+    {
+        await JobPostingService.DismissAsync(id);
+        await LoadAsync();
+    }
+
+    private static string ApplyUrl(JobPosting posting) =>
+        $"/applications/new?jobPostingId={posting.Id}" +
+        $"&companyName={Uri.EscapeDataString(posting.CompanyName ?? "")}" +
+        $"&positionTitle={Uri.EscapeDataString(posting.Title)}" +
+        $"&jobPostingUrl={Uri.EscapeDataString(posting.PostingUrl)}";
+
+    private static string StatusBadgeClass(JobPostingStatus status) => status switch
+    {
+        JobPostingStatus.New => "badge-new",
+        JobPostingStatus.Applied => "badge-applied",
+        JobPostingStatus.Dismissed => "badge-muted",
+        _ => ""
+    };
+}

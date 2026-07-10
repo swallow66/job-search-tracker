@@ -9,6 +9,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Contact> Contacts => Set<Contact>();
     public DbSet<Application> Applications => Set<Application>();
     public DbSet<ApplicationContact> ApplicationContacts => Set<ApplicationContact>();
+    public DbSet<SearchRequest> SearchRequests => Set<SearchRequest>();
+    public DbSet<JobPosting> JobPostings => Set<JobPosting>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -47,6 +49,28 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .WithMany(c => c.ApplicationContacts)
                 .HasForeignKey(ac => ac.ContactId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SearchRequest>(e =>
+        {
+            e.Property(s => s.Name).IsRequired().HasMaxLength(200);
+            e.Property(s => s.Keywords).IsRequired().HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<JobPosting>(e =>
+        {
+            e.Property(p => p.ExternalId).IsRequired().HasMaxLength(50);
+            e.Property(p => p.Title).IsRequired().HasMaxLength(300);
+            e.Property(p => p.PostingUrl).IsRequired().HasMaxLength(1000);
+            e.HasIndex(p => new { p.SearchRequestId, p.ExternalId }).IsUnique();
+            e.HasOne(p => p.SearchRequest)
+                .WithMany(s => s.JobPostings)
+                .HasForeignKey(p => p.SearchRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(p => p.Application)
+                .WithMany()
+                .HasForeignKey(p => p.ApplicationId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

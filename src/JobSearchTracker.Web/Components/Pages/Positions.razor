@@ -1,7 +1,133 @@
 @page "/positions"
+@using JobSearchTracker.Core.Entities
+@using JobSearchTracker.Data.Services
+@inject SearchRequestService SearchRequestService
+@inject JobSearchRunnerService JobSearchRunner
+@inject NavigationManager Nav
+@rendermode InteractiveServer
 
 <PageTitle>Positions</PageTitle>
 
-<h1>Positions</h1>
+<div class="page-header">
+    <h1>Positions</h1>
+    <div class="page-header-actions">
+        <button class="btn btn-secondary" @onclick="RunAllAsync" disabled="@(_running || _searches is not { Count: > 0 })">
+            @(_running ? "Running..." : "Run All Searches")
+        </button>
+        <a class="btn btn-primary" href="/positions/searches/new">+ Add Search</a>
+    </div>
+</div>
 
-<p class="empty-state">No positions yet.</p>
+@if (!string.IsNullOrEmpty(_runSummary))
+{
+    <p class="run-summary">@_runSummary</p>
+}
+
+@if (_searches is null)
+{
+    <p>Loading...</p>
+}
+else if (_searches.Count == 0)
+{
+    <p class="empty-state">No saved searches yet. Click "Add Search" to track postings for a role, e.g. "QA Manager in Canada".</p>
+}
+else
+{
+    <table class="applications-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Keywords</th>
+                <th>Location</th>
+                <th>Filters</th>
+                <th>Last Run</th>
+                <th>New</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var search in _searches)
+            {
+                <tr>
+                    <td>@search.Name</td>
+                    <td>@search.Keywords</td>
+                    <td>@search.Location</td>
+                    <td>
+                        @if (search.WorkplaceType is not null)
+                        {
+                            <span class="badge">@search.WorkplaceType</span>
+                        }
+                        @if (search.DatePosted != JobSearchTracker.Core.Enums.DatePostedFilter.AnyTime)
+                        {
+                            <span class="badge">@search.DatePosted</span>
+                        }
+                        @if (!search.IsActive)
+                        {
+                            <span class="badge badge-muted">Inactive</span>
+                        }
+                    </td>
+                    <td>@(search.LastRunAt is null ? "Never" : search.LastRunAt.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm"))</td>
+                    <td>
+                        @if (_newCounts.TryGetValue(search.Id, out var count) && count > 0)
+                        {
+                            <span class="badge badge-new">@count new</span>
+                        }
+                        else
+                        {
+                            <span>—</span>
+                        }
+                    </td>
+                    <td class="actions">
+                        <a href="/positions/@search.Id">View Results</a>
+                        <a href="/positions/searches/@search.Id/edit">Edit</a>
+                        <button class="btn btn-link btn-danger" @onclick="() => DeleteAsync(search.Id)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<SearchRequest>? _searches;
+    private Dictionary<int, int> _newCounts = new();
+    private bool _running;
+    private string? _runSummary;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _searches = await SearchRequestService.GetAllAsync();
+        _newCounts = await SearchRequestService.GetNewCountsAsync();
+    }
+
+    private async Task RunAllAsync()
+    {
+        _running = true;
+        _runSummary = null;
+        try
+        {
+            var results = await JobSearchRunner.RunAllActiveAsync();
+            var total = results.Sum(r => r.NewPostingsCount);
+            _runSummary = results.Count == 0
+                ? "No active searches to run."
+                : $"Found {total} new posting(s) across {results.Count} search(es).";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _runSummary = $"Search run failed: {ex.Message}";
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+
+    private async Task DeleteAsync(int id)
+    {
+        await SearchRequestService.DeleteAsync(id);
+        await LoadAsync();
+    }
+}
