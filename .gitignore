@@ -8,6 +8,9 @@ obj/
 *.db-shm
 *.db-wal
 
+## Uploaded resumes (personal files, local only)
+src/JobSearchTracker.Web/Resumes/
+
 ## VS Code
 .vs/
 

@@ -136,6 +136,11 @@ h1:focus {
     margin-top: 1.5rem;
 }
 
+.upload-status {
+    font-size: 0.85rem;
+    color: #374151;
+}
+
 .valid.modified:not([type=checkbox]) {
     outline: 1px solid #26b050;
 }

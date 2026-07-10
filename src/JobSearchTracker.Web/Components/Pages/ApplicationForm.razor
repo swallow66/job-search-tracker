@@ -5,8 +5,10 @@
 @using JobSearchTracker.Core.Enums
 @using JobSearchTracker.Data.Services
 @using JobSearchTracker.Web.Models
+@using JobSearchTracker.Web.Services
 @inject ApplicationService ApplicationService
 @inject CompanyService CompanyService
+@inject ResumeStorageService ResumeStorage
 @inject NavigationManager Nav
 @rendermode InteractiveServer
 
@@ -82,8 +84,22 @@ else
         </div>
 
         <div class="form-group">
-            <label>Resume File Path</label>
-            <InputText @bind-Value="_model.ResumeFilePath" placeholder="C:\Resumes\..." />
+            <label>Resume File</label>
+            <InputFile OnChange="OnResumeSelectedAsync" accept=".pdf,.doc,.docx" disabled="@_uploading" />
+            @if (_uploading)
+            {
+                <span class="upload-status">Uploading...</span>
+            }
+            else if (!string.IsNullOrEmpty(_model.ResumeFilePath))
+            {
+                <span class="upload-status">
+                    Uploaded: <a href="@ResumeDownloadUrl" target="_blank" rel="noopener">@System.IO.Path.GetFileName(_model.ResumeFilePath)</a>
+                </span>
+            }
+            @if (!string.IsNullOrEmpty(_uploadError))
+            {
+                <span class="validation-message">@_uploadError</span>
+            }
         </div>
 
         <div class="form-actions">
@@ -163,5 +179,41 @@ else
         }
 
         Nav.NavigateTo("/");
+    }
+
+    private bool _uploading;
+    private string? _uploadError;
+
+    private string ResumeDownloadUrl =>
+        "/resumes/" + string.Join('/', _model.ResumeFilePath!.Split('/').Select(Uri.EscapeDataString));
+
+    private async Task OnResumeSelectedAsync(InputFileChangeEventArgs e)
+    {
+        _uploadError = null;
+        const long maxSize = 10 * 1024 * 1024;
+
+        if (e.File.Size > maxSize)
+        {
+            _uploadError = "File is too large (max 10 MB).";
+            return;
+        }
+
+        _uploading = true;
+        try
+        {
+            await using var stream = e.File.OpenReadStream(maxSize);
+            var companyName = string.IsNullOrWhiteSpace(_model.CompanyName) ? "Unsorted" : _model.CompanyName;
+            _model.ResumeFilePath = await ResumeStorage.SaveAsync(companyName, e.File.Name, stream);
+            if (string.IsNullOrWhiteSpace(_model.ResumeVersion))
+                _model.ResumeVersion = System.IO.Path.GetFileNameWithoutExtension(e.File.Name);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _uploadError = ex.Message;
+        }
+        finally
+        {
+            _uploading = false;
+        }
     }
 }

@@ -1,7 +1,10 @@
 using JobSearchTracker.Data;
 using JobSearchTracker.Data.Services;
 using JobSearchTracker.Web.Components;
+using JobSearchTracker.Web.Services;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,10 +12,15 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Raise the SignalR message size limit so resume uploads (up to 10 MB) fit through the Blazor Server circuit.
+builder.Services.Configure<HubOptions>(options =>
+    options.MaximumReceiveMessageSize = 10 * 1024 * 1024);
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
 builder.Services.AddScoped<ApplicationService>();
 builder.Services.AddScoped<CompanyService>();
+builder.Services.AddSingleton<ResumeStorageService>();
 
 var app = builder.Build();
 
@@ -21,6 +29,14 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
 }
+
+var resumesRoot = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, app.Configuration["ResumeStorage:RootPath"] ?? "Resumes"));
+Directory.CreateDirectory(resumesRoot);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(resumesRoot),
+    RequestPath = "/resumes"
+});
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

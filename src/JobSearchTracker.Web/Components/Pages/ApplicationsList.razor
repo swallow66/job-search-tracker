@@ -73,7 +73,16 @@ else
                     <td>
                         <span class="badge">@app.Source</span>
                     </td>
-                    <td>@(app.ResumeVersion ?? "—")</td>
+                    <td>
+                        @if (!string.IsNullOrWhiteSpace(app.ResumeFilePath))
+                        {
+                            <a href="@ResumeDownloadUrl(app.ResumeFilePath)" target="_blank" rel="noopener">@(app.ResumeVersion ?? "Resume")</a>
+                        }
+                        else
+                        {
+                            @(app.ResumeVersion ?? "—")
+                        }
+                    </td>
                     <td class="actions">
                         <a href="/applications/@app.Id/edit">Edit</a>
                         <button class="btn btn-link btn-danger" @onclick="() => DeleteAsync(app.Id)">Delete</button>
@@ -121,4 +130,7 @@ else
         await ApplicationService.DeleteAsync(id);
         await LoadAsync();
     }
+
+    private static string ResumeDownloadUrl(string relativePath) =>
+        "/resumes/" + string.Join('/', relativePath.Split('/').Select(Uri.EscapeDataString));
 }
