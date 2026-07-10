@@ -202,6 +202,15 @@ h1:focus {
     align-items: center;
 }
 
+.action-slot {
+    display: inline-block;
+    min-width: 95px;
+}
+
+.action-slot:last-child {
+    min-width: 60px;
+}
+
 .application-form {
     max-width: 480px;
     background: white;

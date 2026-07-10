@@ -16,8 +16,12 @@ builder.Services.AddRazorComponents()
 builder.Services.Configure<HubOptions>(options =>
     options.MaximumReceiveMessageSize = 10 * 1024 * 1024);
 
+// Resolve the SQLite file path relative to the content root, not the process's working
+// directory — otherwise launching the app from a different cwd silently creates a fresh,
+// empty database instead of opening the real one.
+var sqliteDbPath = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "jobsearch.db"));
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
+    options.UseSqlite($"Data Source={sqliteDbPath}"));
 builder.Services.AddScoped<ApplicationService>();
 builder.Services.AddScoped<CompanyService>();
 builder.Services.AddSingleton<ResumeStorageService>();

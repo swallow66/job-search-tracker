@@ -61,7 +61,7 @@ else
                     <th>Location</th>
                     <th>Posted</th>
                     <th>Status</th>
-                    <th></th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -74,14 +74,18 @@ else
                         <td>@(posting.PostedDate?.ToString("yyyy-MM-dd") ?? "—")</td>
                         <td><span class="badge @StatusBadgeClass(posting.Status)">@posting.Status</span></td>
                         <td class="actions">
-                            @if (posting.Status != JobPostingStatus.Applied)
-                            {
-                                <a href="@ApplyUrl(posting)">Mark Applied</a>
-                            }
-                            @if (posting.Status != JobPostingStatus.Dismissed && posting.Status != JobPostingStatus.Applied)
-                            {
-                                <button class="btn btn-link btn-danger" @onclick="() => DismissAsync(posting.Id)">Dismiss</button>
-                            }
+                            <span class="action-slot">
+                                @if (posting.Status != JobPostingStatus.Applied)
+                                {
+                                    <a href="@ApplyUrl(posting)">Mark Applied</a>
+                                }
+                            </span>
+                            <span class="action-slot">
+                                @if (posting.Status != JobPostingStatus.Dismissed && posting.Status != JobPostingStatus.Applied)
+                                {
+                                    <button class="btn btn-link btn-danger" @onclick="() => DismissAsync(posting.Id)">Dismiss</button>
+                                }
+                            </span>
                         </td>
                     </tr>
                 }
