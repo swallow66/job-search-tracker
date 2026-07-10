@@ -11,6 +11,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ApplicationContact> ApplicationContacts => Set<ApplicationContact>();
     public DbSet<SearchRequest> SearchRequests => Set<SearchRequest>();
     public DbSet<JobPosting> JobPostings => Set<JobPosting>();
+    public DbSet<AppSetting> AppSettings => Set<AppSetting>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -71,6 +72,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .WithMany()
                 .HasForeignKey(p => p.ApplicationId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<AppSetting>(e =>
+        {
+            e.Property(s => s.Key).IsRequired().HasMaxLength(100);
+            e.HasIndex(s => s.Key).IsUnique();
         });
     }
 }

@@ -29,6 +29,8 @@ builder.Services.AddHttpClient<LinkedInJobSearchService>();
 builder.Services.AddScoped<SearchRequestService>();
 builder.Services.AddScoped<JobPostingService>();
 builder.Services.AddScoped<JobSearchRunnerService>();
+builder.Services.AddScoped<AppSettingsService>();
+builder.Services.AddHttpClient<LinkedInAuthenticatedDetailService>();
 
 var app = builder.Build();
 

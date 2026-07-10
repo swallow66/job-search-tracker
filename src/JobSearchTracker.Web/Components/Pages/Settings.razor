@@ -1,0 +1,73 @@
+@page "/settings"
+@using JobSearchTracker.Data.Services
+@inject AppSettingsService AppSettingsService
+@rendermode InteractiveServer
+
+<PageTitle>Settings</PageTitle>
+
+<h1>Settings</h1>
+
+<div class="application-form">
+    <h2 class="settings-section-title">LinkedIn Session Cookie</h2>
+
+    <p class="settings-note">
+        Used only for the on-demand <strong>"Get Details"</strong> button on individual job postings
+        (to read workplace type / salary, which LinkedIn only shows to logged-in viewers). The regular
+        search that finds new postings does <strong>not</strong> use this and stays logged-out.
+    </p>
+
+    <p class="settings-warning">
+        ⚠️ This reuses your real LinkedIn session. Automated access is against LinkedIn's Terms of
+        Service — use "Get Details" sparingly, on individual postings you actually care about, not in
+        bulk. This value is stored only in your local database file and is never committed to git.
+    </p>
+
+    <details class="settings-instructions">
+        <summary>How to get your session cookie</summary>
+        <ol>
+            <li>Log into linkedin.com in your normal browser.</li>
+            <li>Open DevTools (F12) → <strong>Application</strong> tab (Chrome/Edge) or <strong>Storage</strong> tab (Firefox).</li>
+            <li>Under Cookies, select <code>https://www.linkedin.com</code>.</li>
+            <li>Find the cookie named <code>li_at</code> and copy its value.</li>
+            <li>Paste it below. It'll need updating again once your LinkedIn session expires.</li>
+        </ol>
+    </details>
+
+    @if (_currentlyConfigured)
+    {
+        <p class="settings-status">✓ A session cookie is currently configured.</p>
+    }
+
+    <div class="form-group">
+        <label>li_at cookie value</label>
+        <input type="password" @bind="_cookieValue" @bind:event="oninput" placeholder="Paste your li_at cookie value" />
+    </div>
+
+    <div class="form-actions">
+        <button class="btn btn-primary" @onclick="SaveAsync" disabled="@string.IsNullOrWhiteSpace(_cookieValue)">Save</button>
+        @if (!string.IsNullOrEmpty(_saveMessage))
+        {
+            <span class="upload-status">@_saveMessage</span>
+        }
+    </div>
+</div>
+
+@code {
+    private string _cookieValue = string.Empty;
+    private bool _currentlyConfigured;
+    private string? _saveMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var existing = await AppSettingsService.GetAsync(AppSettingsService.LinkedInSessionCookieKey);
+        _currentlyConfigured = !string.IsNullOrWhiteSpace(existing);
+    }
+
+    private async Task SaveAsync()
+    {
+        await AppSettingsService.SetAsync(AppSettingsService.LinkedInSessionCookieKey, _cookieValue.Trim());
+        _currentlyConfigured = true;
+        _cookieValue = string.Empty;
+        _saveMessage = "Saved.";
+    }
+}

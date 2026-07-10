@@ -48,4 +48,16 @@ public class JobPostingService(AppDbContext db)
             await db.SaveChangesAsync();
         }
     }
+
+    public async Task SaveDetailsAsync(int id, WorkplaceType? workplaceType, string? salary)
+    {
+        var posting = await db.JobPostings.FindAsync(id);
+        if (posting is not null)
+        {
+            posting.WorkplaceType = workplaceType;
+            posting.Salary = salary;
+            posting.DetailsFetchedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+        }
+    }
 }

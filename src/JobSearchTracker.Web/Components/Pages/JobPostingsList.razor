@@ -5,6 +5,7 @@
 @inject SearchRequestService SearchRequestService
 @inject JobPostingService JobPostingService
 @inject JobSearchRunnerService JobSearchRunner
+@inject LinkedInAuthenticatedDetailService LinkedInDetailService
 @inject NavigationManager Nav
 @rendermode InteractiveServer
 
@@ -34,6 +35,11 @@ else
         <p class="run-summary">@_runSummary</p>
     }
 
+    @if (!string.IsNullOrEmpty(_detailsError))
+    {
+        <p class="run-summary run-summary-error">@_detailsError</p>
+    }
+
     <div class="filters">
         @foreach (var tab in _statusTabs)
         {
@@ -59,6 +65,8 @@ else
                     <th>Title</th>
                     <th>Company</th>
                     <th>Location</th>
+                    <th>Work Type</th>
+                    <th>Salary</th>
                     <th>Posted</th>
                     <th>Status</th>
                     <th>Actions</th>
@@ -71,19 +79,46 @@ else
                         <td><a href="@posting.PostingUrl" target="_blank" rel="noopener" @onclick="() => OnPostingOpenedAsync(posting)">@posting.Title</a></td>
                         <td>@(posting.CompanyName ?? "—")</td>
                         <td>@(posting.Location ?? "—")</td>
+                        <td>
+                            @if (posting.WorkplaceType is not null)
+                            {
+                                <span class="badge">@posting.WorkplaceType</span>
+                            }
+                            else if (_search?.WorkplaceType is not null)
+                            {
+                                <span class="badge badge-muted" title="From your search filter — not yet confirmed for this specific listing">@_search.WorkplaceType (searched)</span>
+                            }
+                            else
+                            {
+                                <span>—</span>
+                            }
+                        </td>
+                        <td>@(posting.Salary ?? "—")</td>
                         <td>@(posting.PostedDate?.ToString("yyyy-MM-dd") ?? "—")</td>
                         <td><span class="badge @StatusBadgeClass(posting.Status)">@posting.Status</span></td>
                         <td class="actions">
-                            <span class="action-slot">
+                            <span class="action-slot-apply">
                                 @if (posting.Status != JobPostingStatus.Applied)
                                 {
                                     <a href="@ApplyUrl(posting)">Mark Applied</a>
                                 }
+                                else
+                                {
+                                    <span class="action-muted">—</span>
+                                }
                             </span>
-                            <span class="action-slot">
+                            <span class="action-slot-dismiss">
                                 @if (posting.Status != JobPostingStatus.Dismissed && posting.Status != JobPostingStatus.Applied)
                                 {
                                     <button class="btn btn-link btn-danger" @onclick="() => DismissAsync(posting.Id)">Dismiss</button>
+                                }
+                            </span>
+                            <span class="action-slot-details">
+                                @if (posting.DetailsFetchedAt is null)
+                                {
+                                    <button class="btn btn-link" disabled="@_fetchingDetailsIds.Contains(posting.Id)" @onclick="() => GetDetailsAsync(posting)">
+                                        @(_fetchingDetailsIds.Contains(posting.Id) ? "Fetching..." : "Get Details")
+                                    </button>
                                 }
                             </span>
                         </td>
@@ -103,6 +138,8 @@ else
     private readonly JobPostingStatus?[] _statusTabs = [null, JobPostingStatus.New, JobPostingStatus.Viewed, JobPostingStatus.Applied, JobPostingStatus.Dismissed];
     private bool _running;
     private string? _runSummary;
+    private readonly HashSet<int> _fetchingDetailsIds = [];
+    private string? _detailsError;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -152,6 +189,27 @@ else
     {
         await JobPostingService.DismissAsync(id);
         await LoadAsync();
+    }
+
+    private async Task GetDetailsAsync(JobPosting posting)
+    {
+        _detailsError = null;
+        _fetchingDetailsIds.Add(posting.Id);
+        StateHasChanged();
+        try
+        {
+            var details = await LinkedInDetailService.FetchDetailsAsync(posting.PostingUrl);
+            await JobPostingService.SaveDetailsAsync(posting.Id, details.WorkplaceType, details.Salary);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _detailsError = $"Could not fetch details for \"{posting.Title}\": {ex.Message}";
+        }
+        finally
+        {
+            _fetchingDetailsIds.Remove(posting.Id);
+        }
     }
 
     private static string ApplyUrl(JobPosting posting) =>

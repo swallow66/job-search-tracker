@@ -18,6 +18,17 @@ public class JobPosting
     public string PostingUrl { get; set; } = string.Empty;
     public DateOnly? PostedDate { get; set; }
 
+    /// <summary>
+    /// True per-listing workplace type, only known once fetched via an authenticated request
+    /// (see LinkedInAuthenticatedDetailService). Null until then.
+    /// </summary>
+    public WorkplaceType? WorkplaceType { get; set; }
+
+    /// <summary>Best-effort salary text scraped from the authenticated detail page, if LinkedIn showed one.</summary>
+    public string? Salary { get; set; }
+
+    public DateTime? DetailsFetchedAt { get; set; }
+
     public JobPostingStatus Status { get; set; } = JobPostingStatus.New;
     public DateTime DiscoveredAt { get; set; } = DateTime.UtcNow;
     public DateTime? ViewedAt { get; set; }
